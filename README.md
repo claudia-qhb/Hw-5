@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Simulator Payoff Opzioni</title>
+  <title>Opzioni - Payoff</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -15,191 +15,162 @@
       text-align: center;
       color: #333;
     }
-    .form-container, .options-table {
+    .form-container {
       text-align: center;
       margin-bottom: 20px;
     }
-    .form-container input, .form-container select {
-      margin: 5px;
-      padding: 8px;
-      font-size: 14px;
+    .option-input {
+      margin: 10px auto;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
     }
-    .form-container button {
-      padding: 8px 16px;
-      background-color: #007bff;
+    .option-input input,
+    .option-input select {
+      padding: 6px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px 20px;
+      margin-top: 10px;
+      background-color: #28a745;
       color: white;
       border: none;
       cursor: pointer;
+      font-size: 16px;
     }
-    .form-container button:hover {
-      background-color: #0056b3;
-    }
-    table {
-      margin: 0 auto;
-      border-collapse: collapse;
-      width: 90%;
-    }
-    th, td {
-      padding: 8px;
-      border: 1px solid #ccc;
+    button:hover {
+      background-color: #218838;
     }
     canvas {
       display: block;
-      margin: 20px auto;
+      margin: 30px auto;
     }
   </style>
 </head>
 <body>
 
-  <h1>Simulatore Payoff Opzioni (Call)</h1>
+<h1>Simulatore Payoff Opzioni</h1>
 
-  <div class="form-container">
-    <input type="number" id="strike" placeholder="Strike">
-    <input type="number" id="premio" placeholder="Premio">
-    <input type="number" id="quantita" placeholder="Quantità">
-    <input type="number" id="scadenza" placeholder="Scadenza (giorni)">
-    <select id="posizione">
-      <option value="long">Long</option>
-      <option value="short">Short</option>
-    </select>
-    <button onclick="aggiungiOpzione()">Aggiungi Opzione</button>
+<div class="form-container">
+  <div id="opzioniContainer">
+    <!-- Le opzioni saranno inserite qui dinamicamente -->
   </div>
+  <button onclick="aggiungiOpzione()">+ Aggiungi Opzione</button><br><br>
+  <button onclick="aggiornaGrafico()">Genera Grafico</button>
+</div>
 
-  <div class="options-table">
-    <table id="tabellaOpzioni">
-      <thead>
-        <tr>
-          <th>Strike</th>
-          <th>Premio</th>
-          <th>Quantità</th>
-          <th>Scadenza</th>
-          <th>Posizione</th>
-          <th>Azioni</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+<canvas id="graficoPayoff" width="700" height="400"></canvas>
 
-  <div style="text-align: center;">
-    <label for="prezzo">Prezzo Attuale Sottostante:</label>
-    <input type="number" id="prezzo" value="100">
-    <button onclick="aggiornaGrafico()">Aggiorna Grafico</button>
-  </div>
+<script>
+  let index = 0;
 
-  <canvas id="graficoPayoff" width="800" height="400"></canvas>
+  function aggiungiOpzione() {
+    const container = document.getElementById('opzioniContainer');
+    const div = document.createElement('div');
+    div.className = 'option-input';
+    div.innerHTML = `
+      <label>Tipo: 
+        <select id="tipo-${index}">
+          <option value="call">Call</option>
+          <option value="put">Put</option>
+        </select>
+      </label>
+      <input type="number" id="strike-${index}" placeholder="Strike" />
+      <input type="number" id="premio-${index}" placeholder="Premio" />
+      <input type="number" id="scadenza-${index}" placeholder="Scadenza (giorni)" />
+      <input type="number" id="quantita-${index}" placeholder="Quantità" />
+      <select id="posizione-${index}">
+        <option value="long">Long</option>
+        <option value="short">Short</option>
+      </select>
+    `;
+    container.appendChild(div);
+    index++;
+  }
 
-  <script>
-    let opzioni = [];
-    let colori = ['green', 'red', 'blue', 'orange', 'purple', 'brown', 'cyan', 'magenta'];
-
-    function aggiungiOpzione() {
-      const strike = parseFloat(document.getElementById("strike").value);
-      const premio = parseFloat(document.getElementById("premio").value);
-      const quantita = parseInt(document.getElementById("quantita").value);
-      const scadenza = parseInt(document.getElementById("scadenza").value);
-      const posizione = document.getElementById("posizione").value;
-
-      if (isNaN(strike) || isNaN(premio) || isNaN(quantita) || isNaN(scadenza)) {
-        alert("Inserisci tutti i valori numerici!");
-        return;
-      }
-
-      opzioni.push({ strike, premio, quantita, scadenza, tipo: "call", posizione });
-      aggiornaTabella();
+  function calcolaPayoff(strike, premio, quantita, tipo, posizione, prezzoMin, prezzoMax) {
+    let payoff = [];
+    for (let i = prezzoMin; i <= prezzoMax; i += 1) {
+      let val = tipo === "call" ? Math.max(0, i - strike) : Math.max(0, strike - i);
+      val -= premio;
+      if (posizione === "short") val *= -1;
+      payoff.push(val * quantita);
     }
+    return payoff;
+  }
 
-    function rimuoviOpzione(index) {
-      opzioni.splice(index, 1);
-      aggiornaTabella();
-    }
+  function aggiornaGrafico() {
+    const prezzoMin = 50;
+    const prezzoMax = 150;
+    const labels = Array.from({length: prezzoMax - prezzoMin + 1}, (_, i) => prezzoMin + i);
+    let datasets = [];
 
-    function aggiornaTabella() {
-      const tbody = document.querySelector("#tabellaOpzioni tbody");
-      tbody.innerHTML = "";
-      opzioni.forEach((opzione, i) => {
-        const row = `<tr>
-          <td>${opzione.strike}</td>
-          <td>${opzione.premio}</td>
-          <td>${opzione.quantita}</td>
-          <td>${opzione.scadenza} gg</td>
-          <td>${opzione.posizione}</td>
-          <td><button onclick="rimuoviOpzione(${i})">Rimuovi</button></td>
-        </tr>`;
-        tbody.innerHTML += row;
-      });
-    }
+    for (let i = 0; i < index; i++) {
+      const tipo = document.getElementById(`tipo-${i}`);
+      const strike = document.getElementById(`strike-${i}`);
+      const premio = document.getElementById(`premio-${i}`);
+      const quantita = document.getElementById(`quantita-${i}`);
+      const posizione = document.getElementById(`posizione-${i}`);
+      if (!tipo || !strike || !premio || !quantita || !posizione) continue;
 
-    function calcolaPayoffOpzione(opzione, prezzi) {
-      return prezzi.map(p => {
-        let payoff = Math.max(0, p - opzione.strike) - opzione.premio;
-        if (opzione.posizione === "short") payoff = -payoff;
-        return payoff * opzione.quantita;
-      });
-    }
-
-    function aggiornaGrafico() {
-      const prezzoAttuale = parseFloat(document.getElementById("prezzo").value);
-      const prezzi = [];
-      const min = prezzoAttuale - 50, max = prezzoAttuale + 50, step = 5;
-      for (let p = min; p <= max; p += step) prezzi.push(p);
-
-      const datasets = [];
-      let payoffTotale = prezzi.map(() => 0);
-
-      opzioni.forEach((opzione, idx) => {
-        const payoff = calcolaPayoffOpzione(opzione, prezzi);
-        payoffTotale = payoffTotale.map((val, i) => val + payoff[i]);
-
-        datasets.push({
-          label: Call ${opzione.posizione} @${opzione.strike} (${opzione.scadenza}gg),
-          data: payoff,
-          borderColor: colori[idx % colori.length],
-          borderWidth: 2,
-          fill: false
-        });
-      });
+      const payoff = calcolaPayoff(
+        parseFloat(strike.value),
+        parseFloat(premio.value),
+        parseInt(quantita.value),
+        tipo.value,
+        posizione.value,
+        prezzoMin,
+        prezzoMax
+      );
 
       datasets.push({
-        label: "Payoff Totale",
-        data: payoffTotale,
-        borderColor: "black",
+        label: `${tipo.value.toUpperCase()} ${posizione.value} - Strike ${strike.value}`,
+        data: payoff,
         borderWidth: 2,
-        borderDash: [5, 5],
-        fill: false
+        borderColor: tipo.value === "call" ? "green" : "red",
+        backgroundColor: "rgba(0,0,0,0)",
       });
+    }
 
-      const ctx = document.getElementById("graficoPayoff").getContext("2d");
-      if (window.chart) window.chart.destroy();
+    const ctx = document.getElementById('graficoPayoff').getContext('2d');
+    if (window.chart) window.chart.destroy();
 
-      window.chart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: prezzi,
-          datasets: datasets
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              display: true
+    window.chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Prezzo Sottostante'
             }
           },
-          scales: {
-            x: {
-              title: {
-                display: true,
-                text: "Prezzo Sottostante"
-              }
-            },
-            y: {
-              title: {
-                display: true,
-                text: "Payoff"
-              }
+          y: {
+            title: {
+              display: true,
+              text: 'Payoff'
             }
           }
         }
+      }
+    });
+  }
+
+  // Inizializza con una opzione di default
+  aggiungiOpzione();
+</script>
+
+</body>
+</html>
+
       });
     }
   </script>
